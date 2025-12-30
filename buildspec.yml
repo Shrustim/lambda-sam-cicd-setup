@@ -64,7 +64,8 @@ phases:
       - echo "ARTIFACT_BUCKET=$ARTIFACT_BUCKET"
       - aws s3 ls "s3://$ARTIFACT_BUCKET" || true
       # Package uploads build artifacts to S3 and produces packaged.yaml
-      - sam package \
+      - |
+        sam package \
           --template-file .aws-sam/build/template.yaml \
           --s3-bucket "$ARTIFACT_BUCKET" \
           --output-template-file packaged.yaml
