@@ -61,11 +61,6 @@ phases:
   post_build:
     commands:
       - echo "== Post-build phase (sam package) =="
-      - |
-        if [ "$ARTIFACT_BUCKET" = "REPLACE_ME_S3_BUCKET_NAME" ] || [ -z "$ARTIFACT_BUCKET" ]; then
-          echo "ERROR: ARTIFACT_BUCKET is not set. Set it in CodeBuild Environment Variables."
-          exit 1
-        fi
 
       # Package uploads build artifacts to S3 and produces packaged.yaml
       - sam package \
