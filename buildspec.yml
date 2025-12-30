@@ -1,0 +1,84 @@
+version: 0.2
+
+env:
+  variables:
+    # ✅ Set this in CodeBuild Environment Variables (recommended)
+    # Example: flashwave-sam-artifacts-dev
+    ARTIFACT_BUCKET: "sam-artifacts-lambda-shrushti"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+      python: 3.11
+    commands:
+      - echo "== Install phase =="
+
+      # --- OPTIONAL: Use Node 22 for running tests (because your Lambda runtime is nodejs22.x)
+      # If your CodeBuild image already supports nodejs:22, you can change runtime-versions nodejs: 22
+      # Otherwise, this installs Node 22 via nvm (works on most CodeBuild standard images).
+      - echo "Switching to Node 22 (optional, but recommended for nodejs22.x functions)..."
+      - |
+        if command -v nvm >/dev/null 2>&1; then
+          nvm install 22
+          nvm use 22
+          node -v
+          npm -v
+        else
+          echo "nvm not found; continuing with default Node runtime"
+          node -v
+          npm -v
+        fi
+
+      # Install AWS SAM CLI
+      - echo "Installing AWS SAM CLI..."
+      - pip install --upgrade pip
+      - pip install aws-sam-cli
+
+  pre_build:
+    commands:
+      - echo "== Pre-build phase (tests) =="
+
+      # Run tests inside your Lambda CodeUri folder: hello-world/
+      - cd hello-world
+
+      # Install deps (uses package-lock.json if present)
+      - npm ci || npm install
+
+      # Run unit tests (won’t fail build if you don't have tests yet)
+      - npm test --if-present
+
+      - cd ..
+
+      # Validate SAM template quickly
+      - sam validate
+
+  build:
+    commands:
+      - echo "== Build phase (sam build) =="
+      - sam build --template-file template.yaml
+
+  post_build:
+    commands:
+      - echo "== Post-build phase (sam package) =="
+      - |
+        if [ "$ARTIFACT_BUCKET" = "REPLACE_ME_S3_BUCKET_NAME" ] || [ -z "$ARTIFACT_BUCKET" ]; then
+          echo "ERROR: ARTIFACT_BUCKET is not set. Set it in CodeBuild Environment Variables."
+          exit 1
+        fi
+
+      # Package uploads build artifacts to S3 and produces packaged.yaml
+      - sam package \
+          --template-file .aws-sam/build/template.yaml \
+          --s3-bucket "$ARTIFACT_BUCKET" \
+          --output-template-file packaged.yaml
+
+artifacts:
+  files:
+    - packaged.yaml
+  discard-paths: yes
+
+cache:
+  paths:
+    - "hello-world/node_modules/**/*"
+    - "/root/.cache/pip/**/*"
